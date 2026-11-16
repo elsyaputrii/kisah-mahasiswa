@@ -12,16 +12,21 @@ class GameScene extends Phaser.Scene {
     this.money = 50000;
     this.energy = 80;
     this.day = 1;
+    this.hour = 7;
+    this.minute = 0;
+
     this.weekdays = [
       'Senin', 'Selasa', 'Rabu', 'Kamis',
       'Jumat', 'Sabtu', 'Minggu'
     ];
-    this.missionCompleted = false;
 
-    // BACKGROUND KAMPUS
+    this.morningCompleted = false;
+    this.afternoonCompleted = false;
+
+    // BACKGROUND
     this.add.rectangle(400, 300, 800, 600, 0x91bd78);
 
-    // JALAN KAMPUS
+    // JALAN
     this.add.rectangle(400, 430, 800, 100, 0xcdbb91);
     this.add.rectangle(400, 300, 100, 600, 0xcdbb91);
 
@@ -46,12 +51,12 @@ class GameScene extends Phaser.Scene {
     this.createTree(220, 520);
     this.createTree(580, 520);
 
-    // BANGKU TAMAN
+    // BANGKU
     this.add.rectangle(240, 315, 65, 13, 0x80512f);
     this.add.rectangle(240, 330, 8, 18, 0x60402b);
     this.add.rectangle(270, 330, 8, 18, 0x60402b);
 
-    // GEDUNG KANTIN
+    // KANTIN
     this.add.rectangle(650, 435, 150, 105, 0xe8d5ad);
     this.add.rectangle(650, 382, 165, 18, 0x9a6847);
     this.add.rectangle(650, 415, 95, 30, 0x8ac6dc);
@@ -63,7 +68,7 @@ class GameScene extends Phaser.Scene {
       fontStyle: 'bold'
     });
 
-    // GEDUNG ASRAMA
+    // ASRAMA
     this.add.rectangle(160, 455, 135, 105, 0xe8d5ad);
     this.add.rectangle(160, 400, 150, 18, 0x9a6847);
     this.add.rectangle(125, 445, 28, 30, 0x8ac6dc);
@@ -104,35 +109,28 @@ class GameScene extends Phaser.Scene {
     // AREA INTERAKSI
     this.interactionZones = [
       {
-        x: 400,
-        y: 240,
+        x: 400, y: 240,
         name: 'GEDUNG KAMPUS',
-        type: 'mission',
-        message: 'Kamu berhasil mengikuti kelas pagi!'
+        type: 'class'
       },
       {
-        x: 240,
-        y: 315,
+        x: 240, y: 315,
         name: 'BANGKU TAMAN',
         type: 'normal',
         message: 'Kamu sedang menikmati suasana kampus.'
       },
       {
-        x: 550,
-        y: 300,
+        x: 550, y: 300,
         name: 'HAFIDZ',
-        type: 'normal',
-        message: 'Hafidz: Hai! Semangat kuliahnya, ya!'
+        type: 'npc'
       },
       {
-        x: 650,
-        y: 435,
+        x: 650, y: 435,
         name: 'KANTIN',
         type: 'canteen'
       },
       {
-        x: 160,
-        y: 455,
+        x: 160, y: 455,
         name: 'ASRAMA',
         type: 'sleep'
       }
@@ -164,6 +162,11 @@ class GameScene extends Phaser.Scene {
       color: '#ffffff'
     });
 
+    this.clockText = this.add.text(20, 67, '', {
+      fontSize: '14px',
+      color: '#ffffff'
+    });
+
     this.moneyText = this.add.text(570, 15, '', {
       fontSize: '16px',
       color: '#ffffff',
@@ -177,34 +180,28 @@ class GameScene extends Phaser.Scene {
 
     this.updateStatus();
 
-    // PANEL MISI
-    this.add.rectangle(145, 125, 250, 85, 0x385d37, 0.95)
+    // PANEL JADWAL
+    this.add.rectangle(145, 145, 250, 115, 0x385d37, 0.95)
       .setStrokeStyle(2, 0xf4e5bd);
 
-    this.add.text(35, 93, 'MISI HARI INI', {
+    this.add.text(35, 100, 'JADWAL KULIAH', {
       fontSize: '16px',
       color: '#ffe6a8',
       fontStyle: 'bold'
     });
 
-    this.missionText = this.add.text(
-      35,
-      120,
-      '',
-      {
-        fontSize: '13px',
-        color: '#ffffff',
-        lineSpacing: 6
-      }
-    );
+    this.scheduleText = this.add.text(35, 125, '', {
+      fontSize: '13px',
+      color: '#ffffff',
+      lineSpacing: 7
+    });
 
-    this.resetMission();
+    this.updateSchedule();
 
     // INFORMASI
     this.infoText = this.add.text(
-      400,
-      560,
-      'Selamat datang! Ayo mulai kehidupan kampusmu.',
+      400, 560,
+      'Selamat datang! Jalani kehidupan kampusmu.',
       {
         fontSize: '15px',
         color: '#ffffff',
@@ -214,13 +211,22 @@ class GameScene extends Phaser.Scene {
       }
     ).setOrigin(0.5);
 
-    // PETUNJUK INTERAKSI
+    // PETUNJUK
     this.hintText = this.add.text(400, 510, '', {
       fontSize: '14px',
       color: '#ffffff',
       backgroundColor: '#385d37',
       padding: { x: 8, y: 5 }
     }).setOrigin(0.5);
+
+    // WAKTU BERJALAN:
+    // Setiap 5 detik = 15 menit dalam game
+    this.clockTimer = this.time.addEvent({
+      delay: 5000,
+      loop: true,
+      callback: this.advanceTime,
+      callbackScope: this
+    });
   }
 
   // MEMBUAT POHON
@@ -231,11 +237,18 @@ class GameScene extends Phaser.Scene {
     this.add.circle(x + 15, y + 8, 17, 0x4e9850);
   }
 
+  // FORMAT JAM
+  getClock() {
+    return `${String(this.hour).padStart(2, '0')}:${String(this.minute).padStart(2, '0')}`;
+  }
+
   // UPDATE STATUS
   updateStatus() {
     this.dayText.setText(
       `Hari ${this.day} | ${this.weekdays[(this.day - 1) % 7]}`
     );
+
+    this.clockText.setText(`Jam: ${this.getClock()}`);
 
     this.moneyText.setText(
       `Uang: Rp${this.money.toLocaleString('id-ID')}`
@@ -244,48 +257,120 @@ class GameScene extends Phaser.Scene {
     this.energyText.setText(`Energi: ${this.energy}%`);
   }
 
-  // RESET MISI HARIAN
-  resetMission() {
-    this.missionCompleted = false;
+  // UPDATE JADWAL
+  updateSchedule() {
+    const morning = this.morningCompleted
+      ? 'SELESAI ✓'
+      : 'Belum selesai';
 
-    this.missionText.setText(
-      '1. Mengikuti kelas pagi\nStatus: Belum selesai'
+    const afternoon = this.afternoonCompleted
+      ? 'SELESAI ✓'
+      : 'Belum selesai';
+
+    this.scheduleText.setText(
+      `08.00 - 09.00 Kelas Pagi\n${morning}\n\n13.00 - 14.00 Kelas Siang\n${afternoon}`
     );
 
-    this.missionText.setColor('#ffffff');
+    this.scheduleText.setColor('#ffffff');
   }
 
-  // MENYELESAIKAN MISI KELAS
-  completeMission() {
-    if (this.missionCompleted) {
-      this.infoText.setText(
-        'Kamu sudah menyelesaikan kelas pagi hari ini!'
-      );
-      return;
+  // WAKTU BERJALAN
+  advanceTime() {
+    if (this.hour >= 23) return;
+
+    this.minute += 15;
+
+    if (this.minute >= 60) {
+      this.minute = 0;
+      this.hour++;
     }
-
-    this.missionCompleted = true;
-    this.money += 10000;
-    this.energy = Math.max(0, this.energy - 10);
-
-    this.missionText.setText(
-      '1. Mengikuti kelas pagi\nStatus: SELESAI ✓'
-    );
-
-    this.missionText.setColor('#a8f0a0');
 
     this.updateStatus();
 
+    // PENGINGAT KELAS PAGI
+    if (this.hour === 8 && this.minute === 0) {
+      this.infoText.setText(
+        'Sudah pukul 08.00! Ayo segera masuk kelas pagi.'
+      );
+    }
+
+    // PENGINGAT KELAS SIANG
+    if (this.hour === 13 && this.minute === 0) {
+      this.infoText.setText(
+        'Sudah pukul 13.00! Waktunya mengikuti kelas siang.'
+      );
+    }
+
+    // KELAS PAGI TERLEWAT
+    if (this.hour === 9 && this.minute === 0 &&
+        !this.morningCompleted) {
+      this.infoText.setText(
+        'Kamu terlambat! Kelas pagi hari ini terlewat.'
+      );
+      this.morningCompleted = true;
+      this.updateSchedule();
+    }
+
+    // KELAS SIANG TERLEWAT
+    if (this.hour === 14 && this.minute === 0 &&
+        !this.afternoonCompleted) {
+      this.infoText.setText(
+        'Kamu terlambat! Kelas siang hari ini terlewat.'
+      );
+      this.afternoonCompleted = true;
+      this.updateSchedule();
+    }
+
+    // PENGINGAT TIDUR
+    if (this.hour === 22 && this.minute === 0) {
+      this.infoText.setText(
+        'Sudah malam! Sebaiknya pulang ke asrama dan tidur.'
+      );
+    }
+  }
+
+  // INTERAKSI KELAS
+  attendClass() {
+    if (this.hour >= 8 && this.hour < 9 &&
+        !this.morningCompleted) {
+
+      this.morningCompleted = true;
+      this.money += 10000;
+      this.energy = Math.max(0, this.energy - 10);
+
+      this.infoText.setText(
+        'Hebat! Kamu berhasil mengikuti kelas pagi. Hadiah Rp10.000!'
+      );
+
+      this.updateStatus();
+      this.updateSchedule();
+      return;
+    }
+
+    if (this.hour >= 13 && this.hour < 14 &&
+        !this.afternoonCompleted) {
+
+      this.afternoonCompleted = true;
+      this.money += 10000;
+      this.energy = Math.max(0, this.energy - 10);
+
+      this.infoText.setText(
+        'Kamu berhasil mengikuti kelas siang! Hadiah Rp10.000!'
+      );
+
+      this.updateStatus();
+      this.updateSchedule();
+      return;
+    }
+
     this.infoText.setText(
-      'SELAMAT! Kamu berhasil mengikuti kelas pagi. Hadiah: Rp10.000!'
+      'Belum waktunya kelas atau jadwal kelas sudah selesai. Periksa jadwal kuliahmu!'
     );
   }
 
   // MEMBELI MAKANAN
   buyFood() {
-    const foodPrice = 15000;
-
-    if (this.money < foodPrice) {
+    if (this.money < 15000) {
       this.infoText.setText(
         'Uangmu tidak cukup untuk membeli nasi goreng!'
       );
@@ -299,46 +384,72 @@ class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.money -= foodPrice;
+    this.money -= 15000;
     this.energy = Math.min(100, this.energy + 30);
 
     this.updateStatus();
 
     this.infoText.setText(
-      `Yummy! Kamu membeli nasi goreng. Energi sekarang ${this.energy}%!`
+      `Yummy! Kamu membeli nasi goreng. Energi sekarang ${this.energy}%.`
     );
   }
 
-  // TIDUR DAN GANTI HARI
-  sleepAtDorm() {
-    const currentDay = this.weekdays[(this.day - 1) % 7];
-
-    if (!this.missionCompleted) {
+  // DIALOG HAFIDZ
+  talkToHafidz() {
+    if (this.hour < 8) {
       this.infoText.setText(
-        `Kamu tidur pada hari ${currentDay}. Misi kelas pagi hari ini terlewat!`
+        'Hafidz: Pagi! Jangan sampai terlambat masuk kelas, ya!'
+      );
+    } else if (this.hour < 12) {
+      this.infoText.setText(
+        'Hafidz: Semangat kuliahnya! Jangan lupa istirahat juga.'
+      );
+    } else if (this.hour < 17) {
+      this.infoText.setText(
+        'Hafidz: Sudah ikut kelas siang belum? Ayo semangat!'
+      );
+    } else if (this.hour < 22) {
+      this.infoText.setText(
+        'Hafidz: Hari ini melelahkan, ya? Jangan lupa makan dan istirahat.'
       );
     } else {
       this.infoText.setText(
-        `Selamat malam! Kamu sudah beristirahat pada hari ${currentDay}.`
+        'Hafidz: Sudah malam! Ayo pulang ke asrama.'
       );
     }
+  }
 
-    // Waktu berpindah ke hari berikutnya
-    this.day++;
-
-    // Energi pulih sepenuhnya
-    this.energy = 100;
-
-    // Misi baru untuk hari berikutnya
-    this.resetMission();
-
-    // Perbarui tampilan status
-    this.updateStatus();
-
-    // Pesan hari baru
-    this.time.delayedCall(1500, () => {
+  // TIDUR DI ASRAMA
+  sleepAtDorm() {
+    if (this.hour < 18) {
       this.infoText.setText(
-        `Selamat pagi! Sekarang Hari ${this.day}, ${this.weekdays[(this.day - 1) % 7]}. Ayo jalani aktivitas kampusmu!`
+        'Masih terlalu awal untuk tidur. Ayo lanjutkan aktivitasmu!'
+      );
+      return;
+    }
+
+    this.clockTimer.paused = true;
+
+    this.infoText.setText(
+      'Kamu beristirahat di asrama. Selamat malam!'
+    );
+
+    this.time.delayedCall(2000, () => {
+      this.day++;
+      this.hour = 7;
+      this.minute = 0;
+      this.energy = 100;
+
+      this.morningCompleted = false;
+      this.afternoonCompleted = false;
+
+      this.updateStatus();
+      this.updateSchedule();
+
+      this.clockTimer.paused = false;
+
+      this.infoText.setText(
+        `Selamat pagi! Hari ${this.day}, ${this.weekdays[(this.day - 1) % 7]}. Ayo jalani aktivitas baru!`
       );
     });
   }
@@ -350,7 +461,6 @@ class GameScene extends Phaser.Scene {
     let dx = 0;
     let dy = 0;
 
-    // GERAKAN KARAKTER
     if (this.cursors.left.isDown || this.keys.left.isDown) {
       dx -= speed;
     }
@@ -367,7 +477,6 @@ class GameScene extends Phaser.Scene {
       dy += speed;
     }
 
-    // BATAS AREA PERMAINAN
     this.player.x = Phaser.Math.Clamp(
       this.player.x + dx, 20, 780
     );
@@ -376,17 +485,14 @@ class GameScene extends Phaser.Scene {
       this.player.y + dy, 90, 570
     );
 
-    // POSISI KEPALA
     this.head.x = this.player.x;
     this.head.y = this.player.y - 22;
 
-    // POSISI NAMA HAFIDZ
     this.npcName.setPosition(
       this.npc.x,
       this.npc.y - 48
     );
 
-    // DETEKSI OBJEK TERDEKAT
     const nearby = this.interactionZones.find(zone => {
       return Phaser.Math.Distance.Between(
         this.player.x,
@@ -403,7 +509,7 @@ class GameScene extends Phaser.Scene {
         );
       } else if (nearby.type === 'sleep') {
         this.hintText.setText(
-          'Tekan E untuk tidur dan lanjut ke hari berikutnya'
+          'Tekan E untuk tidur (mulai pukul 18.00)'
         );
       } else {
         this.hintText.setText(
@@ -411,14 +517,15 @@ class GameScene extends Phaser.Scene {
         );
       }
 
-      // INTERAKSI TOMBOL E
       if (Phaser.Input.Keyboard.JustDown(this.interactKey)) {
-        if (nearby.type === 'mission') {
-          this.completeMission();
+        if (nearby.type === 'class') {
+          this.attendClass();
         } else if (nearby.type === 'canteen') {
           this.buyFood();
         } else if (nearby.type === 'sleep') {
           this.sleepAtDorm();
+        } else if (nearby.type === 'npc') {
+          this.talkToHafidz();
         } else {
           this.infoText.setText(nearby.message);
         }
