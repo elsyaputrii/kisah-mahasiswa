@@ -1,60 +1,71 @@
-import './style.css'
-import heroImg from './assets/hero.png'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.js'
 
-document.querySelector('#app').innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${javascriptLogo}" class="framework" alt="JavaScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.js</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+import Phaser from 'phaser';
+import './style.css';
 
-<div class="ticks"></div>
+class GameScene extends Phaser.Scene {
+  constructor() {
+    super('GameScene');
+  }
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-          <img class="button-icon" src="${javascriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+  create() {
+    // Background area permainan
+    this.cameras.main.setBackgroundColor('#9acb8a');
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+    // Tanah
+    this.add.rectangle(400, 300, 800, 600, 0x9acb8a);
 
-setupCounter(document.querySelector('#counter'))
+    // Jalan
+    this.add.rectangle(400, 300, 180, 600, 0xc9b58c);
+
+    // Karakter mahasiswa
+    this.player = this.add.rectangle(
+      400, 300, 28, 36, 0x3978c5
+    );
+
+    // Kepala karakter
+    this.head = this.add.circle(
+      400, 277, 12, 0xffd1a4
+    );
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys('W,A,S,D');
+
+    this.add.text(20, 20, 'PETUALANGAN MAHASISWA', {
+      fontSize: '22px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    });
+
+    this.add.text(20, 50, 'Gunakan WASD atau tombol panah untuk bergerak', {
+      fontSize: '13px',
+      color: '#ffffff'
+    });
+  }
+
+  update() {
+    const speed = 3;
+    let x = 0;
+    let y = 0;
+
+    if (this.cursors.left.isDown || this.wasd.A.isDown) x -= speed;
+    if (this.cursors.right.isDown || this.wasd.D.isDown) x += speed;
+    if (this.cursors.up.isDown || this.wasd.W.isDown) y -= speed;
+    if (this.cursors.down.isDown || this.wasd.S.isDown) y += speed;
+
+    this.player.x = Phaser.Math.Clamp(this.player.x + x, 15, 785);
+    this.player.y = Phaser.Math.Clamp(this.player.y + y, 15, 585);
+
+    this.head.x = this.player.x;
+    this.head.y = this.player.y - 23;
+  }
+}
+
+new Phaser.Game({
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  parent: 'app',
+  scene: GameScene,
+  pixelArt: true,
+  backgroundColor: '#9acb8a'
+});
