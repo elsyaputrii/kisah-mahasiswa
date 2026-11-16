@@ -23,6 +23,10 @@ class GameScene extends Phaser.Scene {
     this.morningCompleted = false;
     this.afternoonCompleted = false;
     this.libraryCompleted = false;
+    this.assignmentAccepted = false;
+    this.assignmentStudied = false;
+    this.assignmentDeadline = 0;
+    this.assignmentFinished = false;
     this.sleeping = false;
 
     // BACKGROUND
@@ -58,8 +62,19 @@ class GameScene extends Phaser.Scene {
       fontStyle: 'bold'
     });
 
+    // PAPAN TUGAS KULIAH
+    this.add.rectangle(270, 235, 48, 55, 0x9a6847);
+    this.add.rectangle(270, 225, 60, 38, 0xf4e5bd);
+
+    this.add.text(270, 225, 'TUGAS', {
+      fontSize: '11px',
+      color: '#493a2b',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+
     // POHON
     this.createTree(120, 150);
+    this.createTree(680, 150);
     this.createTree(120, 350);
     this.createTree(680, 350);
     this.createTree(220, 520);
@@ -152,6 +167,11 @@ class GameScene extends Phaser.Scene {
         x: 650, y: 155,
         name: 'PERPUSTAKAAN',
         type: 'library'
+      },
+      {
+        x: 270, y: 225,
+        name: 'PAPAN TUGAS',
+        type: 'assignment'
       }
     ];
 
@@ -288,11 +308,13 @@ class GameScene extends Phaser.Scene {
     this.scheduleText.setText(
       `08.00 - 09.00 Kelas Pagi\n${morning}\n\n13.00 - 14.00 Kelas Siang\n${afternoon}`
     );
+
+    this.scheduleText.setColor('#ffffff');
   }
 
   // WAKTU BERJALAN
   advanceTime() {
-    if (this.sleeping || this.hour >= 23) return;
+    if (this.hour >= 23) return;
 
     this.minute += 15;
 
@@ -302,6 +324,7 @@ class GameScene extends Phaser.Scene {
     }
 
     this.updateStatus();
+    this.checkAssignmentDeadline();
 
     if (this.hour === 8 && this.minute === 0) {
       this.infoText.setText(
@@ -409,14 +432,14 @@ class GameScene extends Phaser.Scene {
   studyAtLibrary() {
     if (this.libraryCompleted) {
       this.infoText.setText(
-        'Kamu sudah belajar hari ini. Besok datang lagi ke perpustakaan!'
+        'Kamu sudah belajar hari ini. Besok datang lagi, ya!'
       );
       return;
     }
 
     if (this.energy < 15) {
       this.infoText.setText(
-        'Energi kamu tidak cukup untuk belajar. Makan dulu di kantin, ya!'
+        'Energi tidak cukup. Makan dulu di kantin, ya!'
       );
       return;
     }
@@ -425,11 +448,73 @@ class GameScene extends Phaser.Scene {
     this.money += 5000;
     this.libraryCompleted = true;
 
+    if (this.assignmentAccepted && !this.assignmentFinished &&
+        this.day <= this.assignmentDeadline) {
+      this.assignmentStudied = true;
+    }
+
     this.updateStatus();
 
     this.infoText.setText(
-      'Kamu berhasil menyelesaikan sesi belajar! Energi -15, hadiah Rp5.000. Hebat!'
+      'Kamu selesai belajar! Energi -15 dan mendapat Rp5.000.'
     );
+  }
+
+  // PAPAN TUGAS KULIAH
+  interactAssignmentBoard() {
+    if (this.assignmentFinished) {
+      this.infoText.setText(
+        'Tugas laporan praktikum sudah kamu kumpulkan. Hebat!'
+      );
+      return;
+    }
+
+    if (!this.assignmentAccepted) {
+      this.assignmentAccepted = true;
+      this.assignmentStudied = false;
+      this.assignmentDeadline = this.day + 2;
+
+      this.infoText.setText(
+        `Tugas baru: pelajari materi di perpustakaan lalu kembali ke papan ini untuk mengumpulkan. Deadline: Hari ${this.assignmentDeadline}.`
+      );
+      return;
+    }
+
+    if (this.day > this.assignmentDeadline) {
+      this.infoText.setText(
+        'Deadline tugas sudah lewat. Tugas tidak bisa dikumpulkan.'
+      );
+      return;
+    }
+
+    if (!this.assignmentStudied) {
+      this.infoText.setText(
+        'Tugas belum selesai! Pergi belajar dulu di perpustakaan.'
+      );
+      return;
+    }
+
+    this.assignmentFinished = true;
+    this.money += 20000;
+
+    this.updateStatus();
+
+    this.infoText.setText(
+      'Tugas berhasil dikumpulkan tepat waktu! Kamu mendapat hadiah Rp20.000.'
+    );
+  }
+
+  // CEK DEADLINE TUGAS
+  checkAssignmentDeadline() {
+    if (this.assignmentAccepted && !this.assignmentFinished &&
+        this.day > this.assignmentDeadline) {
+      this.infoText.setText(
+        'Yah, deadline tugas laporan praktikum sudah terlewat!'
+      );
+
+      this.assignmentAccepted = false;
+      this.assignmentStudied = false;
+    }
   }
 
   // DIALOG HAFIDZ
@@ -490,6 +575,7 @@ class GameScene extends Phaser.Scene {
 
       this.sleeping = false;
       this.clockTimer.paused = false;
+      this.checkAssignmentDeadline();
 
       this.infoText.setText(
         `Selamat pagi! Hari ${this.day}, ${this.weekdays[(this.day - 1) % 7]}. Ayo jalani aktivitas baru!`
@@ -560,6 +646,10 @@ class GameScene extends Phaser.Scene {
         this.hintText.setText(
           'Tekan E untuk belajar di perpustakaan'
         );
+      } else if (nearby.type === 'assignment') {
+        this.hintText.setText(
+          'Tekan E untuk mengambil / mengumpulkan tugas'
+        );
       } else {
         this.hintText.setText(
           `Tekan E untuk berinteraksi: ${nearby.name}`
@@ -577,6 +667,8 @@ class GameScene extends Phaser.Scene {
           this.talkToHafidz();
         } else if (nearby.type === 'library') {
           this.studyAtLibrary();
+        } else if (nearby.type === 'assignment') {
+          this.interactAssignmentBoard();
         } else {
           this.infoText.setText(nearby.message);
         }
